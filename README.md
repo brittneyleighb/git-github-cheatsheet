@@ -2,13 +2,6 @@
 
 > A comprehensive, student-friendly reference guide for Git version control and GitHub collaboration
 
-## Quick Start
-
-1. **New to Git?** Start with the [Git Basics](git-github-cheatsheet.md#git-basics) section
-2. **Working on a team project?** Jump to [GitHub Workflow](git-github-cheatsheet.md#github-workflow)
-3. **Ran into problems?** Check [Troubleshooting](git-github-cheatsheet.md#troubleshooting)
-4. **Need advanced techniques?** See [Advanced Git Operations](git-github-cheatsheet.md#advanced-git-operations)
-
 ## What's Inside
 
 - **Essential CLI Commands** - Basic terminal navigation and file operations
@@ -22,7 +15,7 @@
 
 ### Interactive Courses
 
-**[Boot.dev Git Courses](https://www.boot.dev/courses/learn-git)** ⭐ **Top Pick for CS Students**
+**[Boot.dev Git Courses](https://www.boot.dev/courses/learn-git)** 
 - **[Learn Git (Fundamentals)](https://www.boot.dev/courses/learn-git)** - Master the basics plus plumbing commands that make it all work
 - **[Learn Git 2 (Advanced)](https://www.boot.dev/courses/learn-git-2)** - Team collaboration, conflict resolution, and professional workflows
 - Interactive, hands-on learning with real coding challenges
