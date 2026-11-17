@@ -1,6 +1,8 @@
 # Git & GitHub Cheatsheet
 
-A comprehensive reference guide for Git version control and GitHub collaboration.
+A practical reference for Git version control and GitHub collaboration. **Scope:** commands are checked against [the official Git reference](https://git-scm.com/docs), while GitHub collaboration policies vary by repository. This guide is not permission to rewrite shared history.
+
+**Before recovering or rewriting anything:** run `git status`, `git diff`, and `git log --oneline -5`. A Git commit does not automatically protect untracked or ignored files; destructive commands can remove work Git cannot recover.
 
 ## Table of Contents
 - [Essential CLI Commands](#essential-cli-commands)
@@ -16,6 +18,8 @@ A comprehensive reference guide for Git version control and GitHub collaboration
 - [Advanced Inspection](#advanced-inspection)
 - [Security & .gitignore](#security--gitignore)
 - [Troubleshooting](#troubleshooting)
+- [Choosing the Safest Recovery Operation](#choosing-the-safest-recovery-operation)
+- [Practiced Recovery Lab](#practiced-recovery-lab)
 
 ## Essential CLI Commands
 
@@ -24,7 +28,8 @@ A comprehensive reference guide for Git version control and GitHub collaboration
 ls                          # List files and folders
 mkdir folder_name          # Create new folder
 cd folder_name             # Navigate into folder
-rm -rf directory_name      # Delete directory and contents (use with caution!)
+rmdir empty_directory      # Remove an EMPTY directory only
+# Inspect directories before deletion; rm -rf irreversibly removes contents.
 touch filename.txt         # Create new file
 ```
 
@@ -46,7 +51,7 @@ git --version                     # Check if Git is installed
 git config --global user.name "Your Full Name"
 git config --global user.email "your.email@example.com"
 git config --global init.defaultBranch main
-git config --global pull.rebase false
+git config --global pull.rebase false   # Optional: prefer merge when pulling; not mandatory
 ```
 
 ### Viewing & Managing Configuration
@@ -95,15 +100,28 @@ git log                    # View commit history
 git log --oneline         # Compact commit history
 ```
 
-### Undoing Changes
+### Undoing Changes: Inspect Before Acting
+
 ```bash
-git restore filename       # Discard changes in working directory
-git reset HEAD~1          # Undo last commit (keep changes)
-git reset --hard HEAD~1   # Undo last commit (discard changes)
-git stash                 # Temporarily save changes
-git stash pop             # Retrieve stashed changes
-git stash clear           # Delete all stashed changes
+git status                    # Confirm current branch, staged and unstaged changes
+git diff                      # Preview unstaged modifications
+git diff --staged             # Preview staged changes
+git log --oneline -5          # Inspect recent commits
+git reflog -5                 # Inspect recent local HEAD movement
 ```
+
+| Goal | Example | Effect and risk |
+| --- | --- | --- |
+| Unstage a file, keep the edit | `git restore --staged -- file.txt` | Index only |
+| View an older version | `git show HEAD~1:path/to/file` | No file changes |
+| Discard unstaged edits to a tracked file | `git restore --worktree -- file.txt` | **Destructive** to unstaged edits; takes contents from index |
+| Restore a tracked file completely to `HEAD` | `git restore --source=HEAD --staged --worktree -- file.txt` | **Destructive** to staged and unstaged edits |
+| Undo a published commit | `git revert <commit-sha>` | Adds a new commit; preserves shared history |
+| Save tracked changes locally | `git stash push -m "WIP"` | Does **not** include untracked files by default |
+| Also save untracked files | `git stash push -u -m "WIP plus new files"` | Ignores files excluded by `.gitignore` |
+| Inspect and reapply stash without deleting | `git stash list` then `git stash apply stash@{0}` | May conflict; stash entry stays available |
+
+`git reset --mixed HEAD~1` moves the current branch backward and unstages the reverted commit, while retaining worktree changes. Use only for **unpublished** history you control. `git reset --hard` additionally replaces tracked worktree content and index state; `git stash clear` deletes all local stash entries. Both can destroy work. A local reflog may help recover displaced commits but **does not restore uncommitted or untracked files**, and reflogs expire. See [recovery scenarios](#choosing-the-safest-recovery-operation) and the [Git reset manual](https://git-scm.com/docs/git-reset).
 
 ## File Management
 
@@ -122,11 +140,13 @@ rm filename.txt            # Delete from filesystem only
 git rm filename.txt        # Remove from Git and filesystem
 git rm --cached filename.txt  # Remove from Git but keep locally
 
-# Cleaning up untracked files
-git clean -n               # Preview what will be deleted
-git clean -f               # Delete untracked files
-git clean -fd              # Delete untracked files and directories
+# Cleaning up untracked files: NEVER skip the preview
+git status --short          # Examine tracked versus untracked files
+git clean -nd              # DRY RUN: preview untracked files AND directories
+git clean -i               # Interactive removal; choose exactly what to delete
 ```
+
+**Advanced, destructive:** `git clean -fd` deletes matching untracked files/directories, generally without Git recovery. Adding `-x` includes ignored files (for example `.env` and local tool output). Preview the **same flags and path scope** before applying any cleanup, e.g. `git clean -nd -- temp/`. [Git clean reference](https://git-scm.com/docs/git-clean).
 
 ## Branching & Merging
 
@@ -139,7 +159,7 @@ git checkout branch_name   # Switch to branch
 git checkout -b new_branch # Create and switch to new branch
 git merge branch_name      # Merge branch into current branch
 git branch -d branch_name  # Delete branch (safe)
-git branch -D branch_name  # Force delete branch
+git branch -D branch_name  # DESTRUCTIVE: delete even if unmerged; inspect first
 ```
 
 ## Working with Remote Repositories
@@ -155,7 +175,9 @@ git push origin branch_name # Push specific branch
 ### Fetching & Pulling Changes
 ```bash
 git fetch origin           # Download changes (don't merge)
-git pull origin main       # Download and merge changes
+git pull --no-rebase origin main  # Fetch + merge (after confirming current branch)
+# Or: git pull --rebase origin main  # Replay LOCAL commits on updated base
+# For inspection without integrating, use git fetch origin first.
 git clone repo_url         # Copy remote repository locally
 ```
 
@@ -513,17 +535,19 @@ git add -f ignored_file          # Force add ignored file
 git rm --cached file             # Stop tracking file (add to .gitignore after)
 ```
 
-### Emergency: Removing Sensitive Files
+### Emergency: Removing Sensitive Files (Rotate First)
+
+**First response:** revoke or rotate any exposed credential; deleting a file from the latest commit does **not** make a compromised token safe. If this is a public repository, treat the old commit as potentially copied.
+
 ```bash
-# If you accidentally committed sensitive data
-git rm --cached sensitive_file
+# Stop tracking a sensitive file going forward; this DOES NOT erase history.
+git rm --cached -- sensitive_file
 echo "sensitive_file" >> .gitignore
 git add .gitignore
-git commit -m "Remove sensitive file and add to gitignore"
-
-# For files in history, use git filter-branch or BFG Repo-Cleaner
-# (Advanced - research thoroughly before using)
+git commit -m "Stop tracking secret-bearing file"
 ```
+
+Old copies may still exist in previous commits, cached views, PR references, forks and local clones. When revocation is insufficient and historical removal is necessary, follow [GitHub's documented `git-filter-repo` procedure](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository) and coordinate with maintainers. Rewriting published history can break signatures, PR diffs and other clones; **never do a blanket force push as the first response**. Keep non-secret environment templates with placeholders instead of real credentials.
 
 ## Advanced Git Operations
 
@@ -557,17 +581,18 @@ git cherry-pick --no-commit commit_hash  # Cherry-pick without auto-commit
 
 ## Advanced Git Operations
 
-### Stashing (Enhanced)
+### Stashing (Tracked, Untracked, and the Drop Risk)
+
 ```bash
-git stash                     # Stash current changes
-git stash save "work in progress"  # Stash with descriptive message
-git stash list                # View all stashes
-git stash show stash@{0}      # Show changes in specific stash
-git stash apply stash@{1}     # Apply specific stash (keep in stash)
-git stash pop stash@{1}       # Apply and remove specific stash
-git stash drop stash@{1}      # Delete specific stash
-git stash clear               # Delete all stashes
+git stash push -m "WIP before switching branches" # Tracked staged/unstaged changes
+git stash push -u -m "WIP including untracked"    # Also includes untracked files
+git stash list
+git stash show -p stash@{0}                      # Inspect the patch
+git stash apply stash@{0}                       # Restore WITHOUT deleting stash
+# After verifying the result, git stash drop stash@{0} deletes that one entry.
 ```
+
+`git stash pop` applies and, on success, drops the selected stash; it can conflict. `git stash clear` deletes **all** entries. Neither is a good default when you are trying to rescue forgotten work. Ignored files are not included by `-u`; see [git-stash](https://git-scm.com/docs/git-stash).
 
 ### Conflict Resolution
 When Git can't automatically merge changes (like two editors changing the same sentence):
