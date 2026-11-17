@@ -525,7 +525,7 @@ submission.zip
 ### Managing .gitignore
 ```bash
 git check-ignore filename        # Check if file is ignored
-git add -f ignored_file          # Force add ignored file
+git add -f ignored_file          # RISK: bypass ignore rules; inspect for secrets first
 git rm --cached file             # Stop tracking file (add to .gitignore after)
 ```
 
@@ -710,7 +710,7 @@ The [offline recovery test](tests/git_recovery_lab.py) creates disposable Git re
 python3 -m unittest discover -s tests -v
 ```
 
-The lab checks `restore --staged`, `clean -nd` versus interactive deletion boundaries, `revert` as a non-destructive history correction, and recovery of a displaced commit through the local reflog. The tests check only these examples, not every command on this page.
+The lab checks `restore --staged`, the non-deleting `clean -nd` preview, `revert` as a non-destructive history correction, restoring a tracked file from `HEAD`, and recovery of a displaced commit through the local reflog. The tests check only these examples, not every command on this page.
 
 ## Useful Aliases
 
