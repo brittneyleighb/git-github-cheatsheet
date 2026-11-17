@@ -1,6 +1,8 @@
 # Git & GitHub Cheatsheet
 
-A comprehensive reference guide for Git version control and GitHub collaboration.
+A practical reference for Git version control and GitHub collaboration. **Scope:** commands are checked against [the official Git reference](https://git-scm.com/docs), while GitHub collaboration policies vary by repository. This guide is not permission to rewrite shared history.
+
+**Before recovering or rewriting anything:** run `git status`, `git diff`, and `git log --oneline -5`. A Git commit does not automatically protect untracked or ignored files; destructive commands can remove work Git cannot recover.
 
 ## Table of Contents
 - [Essential CLI Commands](#essential-cli-commands)
@@ -16,6 +18,8 @@ A comprehensive reference guide for Git version control and GitHub collaboration
 - [Advanced Inspection](#advanced-inspection)
 - [Security & .gitignore](#security--gitignore)
 - [Troubleshooting](#troubleshooting)
+- [Choosing the Safest Recovery Operation](#choosing-the-safest-recovery-operation)
+- [Practiced Recovery Lab](#practiced-recovery-lab)
 
 ## Essential CLI Commands
 
@@ -24,7 +28,8 @@ A comprehensive reference guide for Git version control and GitHub collaboration
 ls                          # List files and folders
 mkdir folder_name          # Create new folder
 cd folder_name             # Navigate into folder
-rm -rf directory_name      # Delete directory and contents (use with caution!)
+rmdir empty_directory      # Remove an EMPTY directory only
+# Inspect directories before deletion; rm -rf irreversibly removes contents.
 touch filename.txt         # Create new file
 ```
 
@@ -46,7 +51,7 @@ git --version                     # Check if Git is installed
 git config --global user.name "Your Full Name"
 git config --global user.email "your.email@example.com"
 git config --global init.defaultBranch main
-git config --global pull.rebase false
+git config --global pull.rebase false   # Optional: prefer merge when pulling; not mandatory
 ```
 
 ### Viewing & Managing Configuration
@@ -95,15 +100,28 @@ git log                    # View commit history
 git log --oneline         # Compact commit history
 ```
 
-### Undoing Changes
+### Undoing Changes: Inspect Before Acting
+
 ```bash
-git restore filename       # Discard changes in working directory
-git reset HEAD~1          # Undo last commit (keep changes)
-git reset --hard HEAD~1   # Undo last commit (discard changes)
-git stash                 # Temporarily save changes
-git stash pop             # Retrieve stashed changes
-git stash clear           # Delete all stashed changes
+git status                    # Confirm current branch, staged and unstaged changes
+git diff                      # Preview unstaged modifications
+git diff --staged             # Preview staged changes
+git log --oneline -5          # Inspect recent commits
+git reflog -5                 # Inspect recent local HEAD movement
 ```
+
+| Goal | Example | Effect and risk |
+| --- | --- | --- |
+| Unstage a file, keep the edit | `git restore --staged -- file.txt` | Index only |
+| View an older version | `git show HEAD~1:path/to/file` | No file changes |
+| Discard unstaged edits to a tracked file | `git restore --worktree -- file.txt` | **Destructive** to unstaged edits; takes contents from index |
+| Restore a tracked file completely to `HEAD` | `git restore --source=HEAD --staged --worktree -- file.txt` | **Destructive** to staged and unstaged edits |
+| Undo a published commit | `git revert <commit-sha>` | Adds a new commit; preserves shared history |
+| Save tracked changes locally | `git stash push -m "WIP"` | Does **not** include untracked files by default |
+| Also save untracked files | `git stash push -u -m "WIP plus new files"` | Ignores files excluded by `.gitignore` |
+| Inspect and reapply stash without deleting | `git stash list` then `git stash apply stash@{0}` | May conflict; stash entry stays available |
+
+`git reset --mixed HEAD~1` moves the current branch backward and unstages the reverted commit, while retaining worktree changes. Use only for **unpublished** history you control. `git reset --hard` additionally replaces tracked worktree content and index state; `git stash clear` deletes all local stash entries. Both can destroy work. A local reflog may help recover displaced commits but **does not restore uncommitted or untracked files**, and reflogs expire. See [recovery scenarios](#choosing-the-safest-recovery-operation) and the [Git reset manual](https://git-scm.com/docs/git-reset).
 
 ## File Management
 
@@ -122,11 +140,13 @@ rm filename.txt            # Delete from filesystem only
 git rm filename.txt        # Remove from Git and filesystem
 git rm --cached filename.txt  # Remove from Git but keep locally
 
-# Cleaning up untracked files
-git clean -n               # Preview what will be deleted
-git clean -f               # Delete untracked files
-git clean -fd              # Delete untracked files and directories
+# Cleaning up untracked files: NEVER skip the preview
+git status --short          # Examine tracked versus untracked files
+git clean -nd              # DRY RUN: preview untracked files AND directories
+git clean -i               # Interactive removal; choose exactly what to delete
 ```
+
+**Advanced, destructive:** `git clean -fd` deletes matching untracked files/directories, generally without Git recovery. Adding `-x` includes ignored files (for example `.env` and local tool output). Preview the **same flags and path scope** before applying any cleanup, e.g. `git clean -nd -- temp/`. [Git clean reference](https://git-scm.com/docs/git-clean).
 
 ## Branching & Merging
 
@@ -139,7 +159,7 @@ git checkout branch_name   # Switch to branch
 git checkout -b new_branch # Create and switch to new branch
 git merge branch_name      # Merge branch into current branch
 git branch -d branch_name  # Delete branch (safe)
-git branch -D branch_name  # Force delete branch
+git branch -D branch_name  # DESTRUCTIVE: delete even if unmerged; inspect first
 ```
 
 ## Working with Remote Repositories
@@ -155,7 +175,9 @@ git push origin branch_name # Push specific branch
 ### Fetching & Pulling Changes
 ```bash
 git fetch origin           # Download changes (don't merge)
-git pull origin main       # Download and merge changes
+git pull --no-rebase origin main  # Fetch + merge (after confirming current branch)
+# Or: git pull --rebase origin main  # Replay LOCAL commits on updated base
+# For inspection without integrating, use git fetch origin first.
 git clone repo_url         # Copy remote repository locally
 ```
 
@@ -184,12 +206,10 @@ Your Fork: https://github.com/yourusername/awesome-project
 - Creates a complete copy under your account
 - You have full control over your fork
 
-**Step 2: Clone Your Fork (Not the Original!)**
+**Step 2: Clone Your Fork (When You Need a Writable Remote)**
 ```bash
-# ❌ Don't clone the original (you can't push to it)
-git clone https://github.com/someone/awesome-project
-
-# ✅ Clone YOUR fork instead
+# Cloning the original is fine for reading or contributing with direct write access.
+# For a fork-based contribution, clone YOUR fork to make it the writable origin:
 git clone https://github.com/yourusername/awesome-project
 cd awesome-project
 ```
@@ -212,20 +232,18 @@ git remote -v
 # upstream   https://github.com/someone/awesome-project (push)
 ```
 
-**Step 4: Never Work Directly on Main!**
+**Step 4: Use a Feature Branch for Reviewed Contributions**
 ```bash
-# ❌ DON'T DO THIS - working directly on main
-git add .
-git commit -m "my changes"
-
-# ✅ ALWAYS create a feature branch first
+# On a shared or protected main, follow repository rules and prefer PRs.
+# Personal projects may intentionally allow direct commits to main.
+# For the contributor workflow below, create a feature branch:
 git switch -b feature/add-user-authentication
 # Make your changes here
 git add .
 git commit -m "Add user authentication system"
 ```
 
-### Why You Never Work Directly on Main
+### Why Teams Often Protect Main
 
 Think of the `main` branch like the published version of a textbook:
 
@@ -278,12 +296,12 @@ git push origin main
 
 ### Why Fork + Clone Instead of Just Clone?
 
-**If you just clone the original:**
+**If you clone the original without write permission:**
 ```bash
 git clone https://github.com/someone/awesome-project
-# ❌ You CAN'T push changes (no write access)
-# ❌ You CAN'T contribute back to the project
-# ❌ You CAN'T save your work on GitHub
+# You may be unable to push to the original repository.
+# You CAN still edit locally, fork later and propose a pull request.
+# Contributors with write access may push review branches directly.
 ```
 
 **Fork + Clone workflow:**
@@ -332,17 +350,16 @@ git switch -b feature/api-endpoints       # Carol's branch
 # This prevents conflicts and allows code review
 ```
 
-### Summary: The Golden Rules
+### Collaboration Checklist: Choose the Workflow Your Repository Supports
 
-1. **Fork when contributing to others' projects** (open source, etc.)
-2. **Clone your own repositories or your forks** (not the original)
-3. **Always set up upstream** if you forked from someone else
-4. **Never work directly on main** - always use feature branches
-5. **One branch = One feature/fix** - keeps pull requests focused
-6. **Keep your fork synced** with the upstream project regularly
-7. **Push branches to origin** (your fork), create PRs to upstream
+1. **Inspect contributor permissions and branch-protection rules.** Fork if you lack write access or the project asks for it. With permission, creating a PR from a branch in the original repository may be more convenient.
+2. **Clone is a local copy; fork is a GitHub repository copy.** Cloning the original is entirely valid, regardless of write access.
+3. **Add an `upstream` remote if you need it.** The name `upstream` is customary, not mandatory.
+4. **Use focused branches and PRs for reviewed work.** Small personal repositories may intentionally commit directly to `main`; teams should follow their explicit rules.
+5. **Fetch and inspect upstream before updating.** Never hard-reset a branch that might have valuable local work just to “sync a fork.”
+6. **Avoid rewriting published history.** If a shared commit is wrong, generally use `git revert` to create an auditable correction.
 
-This workflow protects everyone's code, enables collaboration, and makes it easy to contribute to projects while keeping your own work organized!
+This workflow supports collaboration without implying that every repository must use a fork or PR.
 
 ## GitHub Workflow
 
@@ -377,19 +394,18 @@ This workflow protects everyone's code, enables collaboration, and makes it easy
 
 7. **Create Pull Request** on GitHub
 
-### Keeping Fork Updated
-```bash
-# Method 1: Fetch and reset
-git fetch --all --prune
-git checkout main
-git reset --hard upstream/main
-git push origin main
+### Keeping Fork Updated Without Discarding Local Changes
 
-# Method 2: Pull and push
-git checkout main
-git pull upstream main
-git push origin main
+```bash
+git status                          # Verify working tree and current branch
+git switch main                     # Work from YOUR fork's main
+git fetch upstream                  # Get upstream refs; no branch changes
+git log --oneline --left-right main...upstream/main # Check divergence
+git merge --ff-only upstream/main   # Only update if fast-forward is possible
+git push origin main                # Update fork after inspection
 ```
+
+If `--ff-only` fails, inspect both histories and deliberately choose a merge or rebase. The old `git reset --hard upstream/main` shortcut could discard local commits and tracked worktree changes, and should not be used as a general fork-sync recipe.
 
 ## Tags & Releases
 
@@ -509,21 +525,23 @@ submission.zip
 ### Managing .gitignore
 ```bash
 git check-ignore filename        # Check if file is ignored
-git add -f ignored_file          # Force add ignored file
+git add -f ignored_file          # RISK: bypass ignore rules; inspect for secrets first
 git rm --cached file             # Stop tracking file (add to .gitignore after)
 ```
 
-### Emergency: Removing Sensitive Files
+### Emergency: Removing Sensitive Files (Rotate First)
+
+**First response:** revoke or rotate any exposed credential; deleting a file from the latest commit does **not** make a compromised token safe. If this is a public repository, treat the old commit as potentially copied.
+
 ```bash
-# If you accidentally committed sensitive data
-git rm --cached sensitive_file
+# Stop tracking a sensitive file going forward; this DOES NOT erase history.
+git rm --cached -- sensitive_file
 echo "sensitive_file" >> .gitignore
 git add .gitignore
-git commit -m "Remove sensitive file and add to gitignore"
-
-# For files in history, use git filter-branch or BFG Repo-Cleaner
-# (Advanced - research thoroughly before using)
+git commit -m "Stop tracking secret-bearing file"
 ```
+
+Old copies may still exist in previous commits, cached views, PR references, forks and local clones. When revocation is insufficient and historical removal is necessary, follow [GitHub's documented `git-filter-repo` procedure](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository) and coordinate with maintainers. Rewriting published history can break signatures, PR diffs and other clones; **never do a blanket force push as the first response**. Keep non-secret environment templates with placeholders instead of real credentials.
 
 ## Advanced Git Operations
 
@@ -551,23 +569,25 @@ git cherry-pick commit_hash
 git cherry-pick --no-commit commit_hash  # Cherry-pick without auto-commit
 
 # Rebase vs Merge (Important distinction!)
-# Rebase: Creates linear history, rewrites commits (cleaner but changes history)
-# Merge: Preserves original history, creates merge commit (messier but safer)
+# Rebase replays commits onto another base (new commit IDs); avoid rewriting shared commits.
+# Merge integrates history without replaying existing commits; can fast-forward WITHOUT a merge commit.
+# Whether a team prefers rebase or merge is a policy and workflow trade-off.
 ```
 
 ## Advanced Git Operations
 
-### Stashing (Enhanced)
+### Stashing (Tracked, Untracked, and the Drop Risk)
+
 ```bash
-git stash                     # Stash current changes
-git stash save "work in progress"  # Stash with descriptive message
-git stash list                # View all stashes
-git stash show stash@{0}      # Show changes in specific stash
-git stash apply stash@{1}     # Apply specific stash (keep in stash)
-git stash pop stash@{1}       # Apply and remove specific stash
-git stash drop stash@{1}      # Delete specific stash
-git stash clear               # Delete all stashes
+git stash push -m "WIP before switching branches" # Tracked staged/unstaged changes
+git stash push -u -m "WIP including untracked"    # Also includes untracked files
+git stash list
+git stash show -p stash@{0}                      # Inspect the patch
+git stash apply stash@{0}                       # Restore WITHOUT deleting stash
+# After verifying the result, git stash drop stash@{0} deletes that one entry.
 ```
+
+`git stash pop` applies and, on success, drops the selected stash; it can conflict. `git stash clear` deletes **all** entries. Neither is a good default when you are trying to rescue forgotten work. Ignored files are not included by `-u`; see [git-stash](https://git-scm.com/docs/git-stash).
 
 ### Conflict Resolution
 When Git can't automatically merge changes (like two editors changing the same sentence):
@@ -587,68 +607,110 @@ When Git can't automatically merge changes (like two editors changing the same s
 
 ## Troubleshooting
 
-### Common Issues & Solutions
+### Common Issues and Recovery Patterns
 
-**Accidentally committed to main branch:**
+**Before doing anything destructive:** `git status`, `git diff`, `git log --oneline -5`. Make sure you know the current branch and whether the affected commit was pushed.
+
+**Accidentally committed to `main`:**
+
+If the commit **has been published or shared**, prefer an ordinary **revert PR**:
+
 ```bash
-git checkout -b feature/new-branch  # Create new branch
-git checkout main                   # Switch to main
-git reset --hard HEAD~1            # Remove commit from main
+git status                       # Check for uncommitted changes
+git switch main
+git pull --ff-only origin main   # Only if main can be updated fast-forward
+git switch -c fix/revert-bad-change
+git revert <bad-commit-sha>      # Records an inverse change; may conflict
+git push -u origin fix/revert-bad-change
+# Open a pull request. Do not reset or force-push a shared main branch.
 ```
 
-**Need to force push after rebase:**
+If it is **entirely local, not published and you control the branch**, first create a branch from the current commit (`git switch -c feature/saved-work`). Then inspect and decide whether to undo the local commit from `main` with `git reset --mixed HEAD~1`. That command moves the current branch, not the new feature branch, and should only be run after switching back to the intended local branch; if in doubt, make a backup ref and use the [recovery lab](#practiced-recovery-lab).
+
+**A rebased feature branch needs a non-fast-forward push:**
+
 ```bash
-git push origin branch_name -f     # Use with caution!
+# On your OWN feature branch, BEFORE rewriting it, record the expected
+# remote tip that your rewritten history is based on.
+git fetch origin
+expected_remote_tip=$(git rev-parse refs/remotes/origin/feature/my-change)
+# After reviewing your planned rebase, rewrite your LOCAL branch as needed.
+git rebase origin/main
+# Reject the push if someone changed the remote branch since your recorded tip:
+git push --force-with-lease=refs/heads/feature/my-change:$expected_remote_tip \
+  origin HEAD:refs/heads/feature/my-change
 ```
 
-**Want to see changes before committing:**
+**Only use on a branch you own, when its repository rules permit rewriting it.** Never run this casually on `main`. The explicit expected SHA is important: Git warns that simple `--force-with-lease` without an explicit value may interact badly with IDEs or background jobs that fetch automatically. See [git-push](https://git-scm.com/docs/git-push).
+
+**Accidentally deleted a tracked file:**
+
 ```bash
-git diff                           # See unstaged changes
-git diff --staged                  # See staged changes
-git diff --stat                    # See summary of changes
+git status
+git show HEAD:path/to/file            # Inspect previous content without changing files
+git restore --source=HEAD --worktree -- path/to/file # Restore HEAD version in worktree
 ```
 
-**Accidentally committed sensitive files:**
-```bash
-git rm --cached sensitive_file     # Remove from Git, keep locally
-echo "sensitive_file" >> .gitignore  # Add to gitignore
-git add .gitignore
-git commit -m "Remove sensitive file from tracking"
-```
-
-**Accidentally deleted important files:**
-```bash
-git checkout HEAD -- filename     # Restore file from last commit
-git checkout commit_hash -- filename  # Restore from specific commit
-```
+The last command **overwrites local worktree edits** for that file. To restore both staging and worktree from `HEAD`, specify `--staged --worktree`. Git cannot restore never-tracked files from a commit.
 
 **Want to undo a merge:**
-```bash
-git reset --hard HEAD~1           # If merge was last commit
-git revert -m 1 commit_hash       # Revert a merge commit safely
-```
+
+A merge may be fast-forward or create a merge commit. Inspect the history with `git log --graph --oneline --decorate -12`. A merge commit can sometimes be reverted with `git revert -m 1 <merge-sha>`, **only after confirming parent 1 is the desired mainline**. Reverting a merge has implications for future merges of that branch; read [git-revert](https://git-scm.com/docs/git-revert) before proceeding. Do **not** assume `git reset --hard HEAD~1` safely undoes every merge.
+
+**Accidentally committed secrets:**
+
+1. Revoke or rotate exposed credentials first.
+2. Stop tracking the file going forward.
+3. Assess whether Git history must be rewritten; follow [GitHub's incident guidance](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository), coordinating with collaborators.
 
 **Forgot what you were working on:**
+
 ```bash
-git status                         # Check current state
-git log --oneline -5              # See recent commits
-git stash list                    # See stashed changes
+git status
+git log --oneline -5
+git stash list
+git reflog -10     # Local reference movements; records can expire
 ```
 
 ## Best Practices
 
-1. **Never commit directly to main/master** - always use feature branches
+1. **Follow repository contribution rules** - prefer PR branches for reviewed team work; direct commits may be acceptable in personal repos
 2. **Write meaningful commit messages** - describe what and why, not how
    - Good: "Fix login validation for empty email fields"
    - Bad: "Fixed bug" or "Updated code"
 3. **Commit often** - small, logical chunks are better than large commits
-4. **Pull before pushing** - avoid conflicts by staying up to date
+4. **Fetch, inspect and intentionally integrate** - avoid automatically merging or rebasing unknown remote changes
 5. **Use .gitignore properly** - never commit secrets, logs, or generated files
 6. **One feature per branch** - keeps pull requests focused and manageable
 7. **Tag important releases** - makes it easy to find and deploy specific versions
 8. **Review your changes** - use `git diff --staged` before committing
 9. **Keep commits atomic** - each commit should represent one logical change
 10. **Use descriptive branch names** - `feature/user-authentication` not `my-branch`
+
+## Choosing the Safest Recovery Operation
+
+| Situation | First choice | Avoid as a first step |
+| --- | --- | --- |
+| Staged a file accidentally | `git restore --staged -- file` | `git reset --hard` |
+| Have uncommitted tracked edits | `git diff`; consider `git stash push -u` or a WIP commit | `git restore` before inspecting |
+| Need to correct a published commit | `git revert <sha>` in a review branch | `git reset --hard` plus force push |
+| Rebase interrupted | `git status` then `git rebase --abort` if needed | Clearing files manually |
+| Need to clean untracked files | `git clean -nd`, then `git clean -i` | `git clean -fdx` |
+| Can't find a local commit after a reset | `git reflog`; create a branch from a still-available SHA | Assuming all data is still recoverable |
+| Secrets exposed in commits | Rotate/revoke credentials; incident procedure | Only adding `.gitignore` |
+| Stash conflict | `git status`, inspect edits and keep stash for now | `git stash clear` |
+
+**History versus working files:** `git reflog` tracks local reference updates; it is not an unlimited backup. Uncommitted tracked modifications discarded by reset/restore and never-tracked files removed by clean generally cannot be recovered using ordinary Git object history. Verify that an old commit still exists before branching from it.
+
+## Practiced Recovery Lab
+
+The [offline recovery test](tests/git_recovery_lab.py) creates disposable Git repositories in the system temporary directory, runs the commands, and checks that they produce the described effects. It never accesses your real repositories, GitHub credentials, or network remotes.
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+The lab checks `restore --staged`, the non-deleting `clean -nd` preview, `revert` as a non-destructive history correction, restoring a tracked file from `HEAD`, and recovery of a displaced commit through the local reflog. The tests check only these examples, not every command on this page.
 
 ## Useful Aliases
 

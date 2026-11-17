@@ -1,6 +1,8 @@
 # Git & GitHub Cheatsheet 🐙🐱
 
-> A comprehensive, student-friendly reference guide for Git version control and GitHub collaboration
+> A practical Git reference with risk labels, recovery examples and repository-specific collaboration advice.
+
+**[Read the Git & GitHub Cheatsheet](git-github-cheatsheet.md)**. Start with the [recovery decision guide](git-github-cheatsheet.md#choosing-the-safest-recovery-operation) before undoing commits or cleaning files. Commands such as `git reset --hard`, `git clean -fd`, `git stash clear` and force pushes can discard work; they are intentionally not included as casual quick fixes.
 
 ## What's Inside
 
@@ -12,6 +14,18 @@
 - **Advanced Operations** - Rebasing, squashing, conflict resolution
 - **Best Practices** - Professional development habits
 - **Troubleshooting** - Solutions to common Git problems
+- **Safer Recovery Decisions** - Working tree versus staged changes versus published commits
+- **Offline Practice Lab** - Automated checks in disposable repositories, with no network access
+
+### Try the Offline Git Recovery Lab
+
+Requirements: Python 3.11+ and Git installed locally. The tests create temporary Git repositories and never mutate this repository or call GitHub.
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+The checks cover staging, safe cleanup previews, reversing a local commit without rewriting history, restoring a tracked file, and finding a displaced commit through the reflog. They **do not** prove all Git commands in the full guide are safe. CI tests the exercises on Python 3.11 and 3.13.
 
 ### Interactive Courses
 
@@ -89,14 +103,17 @@
 |------|---------|
 | Clone repository | `git clone <url>` |
 | Check status | `git status` |
-| Stage changes | `git add .` |
+| Stage intended changes | `git add path/to/file` |
 | Commit changes | `git commit -m "message"` |
-| Push changes | `git push origin main` |
-| Pull changes | `git pull origin main` |
+| Push a review branch | `git push -u origin feature/my-change` |
+| Inspect remote changes | `git fetch origin` |
 | Create branch | `git switch -b branch-name` |
 | Switch branch | `git switch branch-name` |
-| Merge branch | `git merge branch-name` |
+| Fast-forward local main (when appropriate) | `git merge --ff-only origin/main` |
 | View history | `git log --oneline` |
+| Unstage without losing edits | `git restore --staged -- file.txt` |
+| Undo a shared commit | `git revert <commit-sha>` |
+| Preview untracked cleanup | `git clean -nd` |
 
 ## 📄 License
 
