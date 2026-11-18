@@ -4,6 +4,17 @@
 
 **[Read the Git & GitHub Cheatsheet](git-github-cheatsheet.md)**. Start with the [recovery decision guide](git-github-cheatsheet.md#choosing-the-safest-recovery-operation) before undoing commits or cleaning files. Commands such as `git reset --hard`, `git clean -fd`, `git stash clear` and force pushes can discard work; they are intentionally not included as casual quick fixes.
 
+## Git in one picture
+
+Git is a local history database for your project. GitHub is a shared place where those histories can meet. Most confusion disappears once you separate your **working files**, the **staging area** that selects the next snapshot, and the **commit history**.
+
+| If you need to… | Start with… |
+| --- | --- |
+| Save a small change | status → add → commit |
+| Work without disturbing main | branches |
+| Share or review work | remotes and pull requests |
+| Undo something | the recovery decision guide |
+
 ## What's Inside
 
 - **Essential CLI Commands** - Basic terminal navigation and file operations
