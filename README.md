@@ -15,6 +15,14 @@ Git is a local history database for your project. GitHub is a shared place where
 | Share or review work | remotes and pull requests |
 | Undo something | the recovery decision guide |
 
+## Try it safely
+
+**Predict:** what should happen before you act.  
+**Try:** use a local, reversible example.  
+**Explain:** describe the result in your own words.
+
+In a throwaway folder, create one text file, run `git init`, then make one change at a time. Before each of `git status`, `git add`, and `git commit`, predict what Git will say changed. Compare that prediction with the result.
+
 ## What's Inside
 
 - **Essential CLI Commands** - Basic terminal navigation and file operations
